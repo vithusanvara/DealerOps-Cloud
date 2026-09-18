@@ -25,14 +25,14 @@ def test_health_check():
 # Test that a dealership employee can add a vehicle.
 def test_create_vehicle():
     # Create sample vehicle information to send to the application.
-    vehicle = {
-        "id": 1,
-        "year": 2024,
-        "make": "Toyota",
-        "model": "Corolla",
-        "price": 29995.00,
-        "status": "available",
-    }
+vehicle = {
+    "year": 2024,
+    "make": "Toyota",
+    "model": "Corolla",
+    "vin": "2T1BURHE0RC123456",
+    "price": 29995.00,
+    "status": "available",
+}
 
     # Send the sample vehicle to the POST /vehicles endpoint.
     response = client.post("/vehicles", json=vehicle)
