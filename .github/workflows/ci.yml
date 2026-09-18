@@ -37,5 +37,9 @@ jobs:
           pip install -r requirements.txt
 
       # Run all automated tests located in the tests folder.
+            # Run the tests through Python and explicitly include the
+      # repository's root folder in Python's import path.
       - name: Run automated tests
-        run: pytest
+        env:
+          PYTHONPATH: .
+        run: python -m pytest
