@@ -1,81 +1,89 @@
-# Import FastAPI, the framework used to create the website's backend API.
-from fastapi import FastAPI
+"""Main FastAPI application for the DealerOps inventory platform."""
 
-# Import BaseModel, which validates the vehicle information users submit.
-from pydantic import BaseModel
+from fastapi import Depends, FastAPI, HTTPException, status
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app import models
+from app.database import engine, get_database
+from app.schemas import VehicleCreate, VehicleResponse
 
 
-# Create the DealerOps Cloud application.
-# This information will appear on the automatic API documentation page.
+# Create database tables that do not already exist.
+# SQLAlchemy uses the models in models.py to determine the table structure.
+models.Base.metadata.create_all(bind=engine)
+
+
+# Create the FastAPI application.
 app = FastAPI(
-    title="DealerOps Cloud",
-    description="Cloud-based dealership inventory management system",
-    version="0.1.0",
+    title="DealerOps Cloud API",
+    description="API for managing dealership vehicle inventory.",
+    version="1.0.0",
 )
 
 
-# Create a Vehicle model.
-# This defines the information required for each vehicle in the system.
-class Vehicle(BaseModel):
-    # A unique identification number for the vehicle record.
-    id: int
-
-    # The model year of the vehicle, such as 2024.
-    year: int
-
-    # The vehicle manufacturer, such as Toyota or Jeep.
-    make: str
-
-    # The vehicle model, such as Corolla or Wrangler.
-    model: str
-
-    # The advertised selling price of the vehicle.
-    price: float
-
-    # The vehicle's current inventory status.
-    # If no status is provided, it will automatically be "available."
-    status: str = "available"
-
-
-# This temporary list acts like a small database.
-# Vehicles created through the API will be stored here while the app is running.
-# The information will disappear whenever the application restarts.
-# We will replace this list with a PostgreSQL database later.
-vehicles: list[Vehicle] = []
-
-
-# The @app.get("/") line creates the application's main URL.
-# When someone visits the home address, this function returns basic app details.
 @app.get("/")
-def home():
+def read_root():
+    """Return basic information confirming that the API is running."""
+
     return {
-        "application": "DealerOps Cloud",
-        "version": "0.1.0",
+        "application": "DealerOps Cloud API",
         "status": "running",
     }
 
 
-# This creates a health-check endpoint.
-# AWS and monitoring systems can use it to confirm the application is running.
 @app.get("/health")
-def health():
-    return {"status": "healthy"}
+def health_check():
+    """Provide a health-check endpoint for Docker, AWS and monitoring tools."""
+
+    return {
+        "status": "healthy",
+    }
 
 
-# This creates an endpoint that returns every vehicle in inventory.
-# A GET request reads information without changing it.
-@app.get("/vehicles")
-def get_vehicles():
-    return vehicles
+@app.get(
+    "/vehicles",
+    response_model=list[VehicleResponse],
+)
+def get_vehicles(
+    database: Session = Depends(get_database),
+):
+    """Retrieve all vehicles currently stored in the database."""
+
+    return database.query(models.Vehicle).all()
 
 
-# This creates an endpoint for adding a vehicle.
-# A POST request sends new information to the application.
-# The 201 status code means that a new record was created successfully.
-@app.post("/vehicles", status_code=201)
-def create_vehicle(vehicle: Vehicle):
-    # Add the validated vehicle to the temporary inventory list.
-    vehicles.append(vehicle)
+@app.post(
+    "/vehicles",
+    response_model=VehicleResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_vehicle(
+    vehicle: VehicleCreate,
+    database: Session = Depends(get_database),
+):
+    """Validate and save a new vehicle in the inventory database."""
 
-    # Return the new vehicle so the user can confirm what was saved.
-    return vehicle
+    # Convert the validated API information into a database record.
+    database_vehicle = models.Vehicle(**vehicle.model_dump())
+
+    # Prepare the record to be saved.
+    database.add(database_vehicle)
+
+    try:
+        # Permanently save the vehicle.
+        database.commit()
+
+        # Reload the record so its generated ID is available.
+        database.refresh(database_vehicle)
+
+    except IntegrityError:
+        # Undo the failed transaction if the VIN already exists.
+        database.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A vehicle with this VIN already exists.",
+        )
+
+    return database_vehicle
