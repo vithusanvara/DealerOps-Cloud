@@ -43,3 +43,8 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m pytest
+
+      # Build the Docker image to confirm that the application
+      # can be packaged consistently for future AWS deployment.
+      - name: Build Docker image
+        run: docker build -t dealerops-cloud:test .
