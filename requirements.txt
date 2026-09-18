@@ -1,0 +1,14 @@
+# FastAPI is the framework used to build the DealerOps backend API.
+fastapi==0.116.1
+
+# Uvicorn runs the FastAPI application as a web server.
+uvicorn[standard]==0.35.0
+
+# Pydantic validates vehicle information submitted to the application.
+pydantic==2.11.7
+
+# Pytest runs the project's automated tests.
+pytest==8.4.1
+
+# HTTPX allows the tests to send requests to the FastAPI application.
+httpx==0.28.1
