@@ -12,3 +12,5 @@ pytest==8.4.1
 
 # HTTPX allows the tests to send requests to the FastAPI application.
 httpx==0.28.1
+
+sqlalchemy==2.0.43
